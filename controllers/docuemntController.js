@@ -5,6 +5,8 @@ import { extractTextFromPDf } from '../utils/pdfParser.js';
 import { chunkText } from '../utils/textChunker.js';
 import fs from 'fs/promises';
 import mongoose from 'mongoose';
+import cloudinary from '../config/cloudinary.js';
+
 
 
 //@desc Uploads PDF document
