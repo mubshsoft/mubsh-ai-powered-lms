@@ -10,56 +10,62 @@ import mongoose from 'mongoose';
 //@desc Uploads PDF document
 //@route POST /api/documents/uploads
 //@access private
-export const uploadDocument = async (req,res,next)=>{
-    try{
-        if(!req.file){
-            return res.status(400).json({
-                succcess: false,
-                error: 'Please upload a PDF file', 
-                statusCode: 400
-            });
-        }
-        const {title} = req.body;
-        if(!title){
-            //Delete uploaded file if no title provided
-            await fs.unlink(req.file.path);
-            return res.status(400).json({
-                succcess:false,
-                error:'Please provide a document title', 
-                statusCode: 400
-            });
-        }
-
-        //Construct the URL for the uploaded file
-        const baseUrl = `http://localhost:${process.env.PORT || 5000}`;
-        const fileUrl = `${baseUrl}/uploads/documents/${req.file.filename}`;
-
-        //Create document record
-        const document = await Document.create({
-            userId: req.user._id,
-            title,
-            fileName: req.file.originalname,
-            filePath: fileUrl, //store the URL instead of the local path
-            fileSize: req.file.size,
-            status:'processing'
-        });
-        //process PDF in background (in production, use a queue like Bull)
-        processPDF(document._id, req.file.path).catch(err=> {
-            console.log('PDF processing error', err);
-        });
-        res.status(201).json({
-            success:true,
-            data: document, 
-            message: 'Document uploaded successfully. Processing in progress...'
-        });
-    } catch(error){
-        //clean up file on error
-        if(req.file){
-            await fs.unlink(req.file.path).catch(()=>{})
-        }
-        next(error);
+export const uploadDocument = async (req, res, next) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        error: 'Please upload a PDF file',
+      });
     }
+
+    const { title } = req.body;
+    if (!title) {
+      await fs.unlink(req.file.path);
+      return res.status(400).json({
+        success: false,
+        error: 'Please provide a document title',
+      });
+    }
+
+    // ✅ Upload PDF to Cloudinary
+    const cloudinaryResult = await cloudinary.uploader.upload(
+      req.file.path,
+      {
+        folder: 'lms/documents',
+        resource_type: 'raw', // IMPORTANT for PDF
+      }
+    );
+
+    // ✅ Create document record
+    const document = await Document.create({
+      userId: req.user._id,
+      title,
+      fileName: req.file.originalname,
+      filePath: cloudinaryResult.secure_url, // Cloudinary URL
+      fileSize: req.file.size,
+      status: 'processing',
+    });
+
+    // ✅ Process PDF using local file
+    processPDF(document._id, req.file.path).catch(err => {
+      console.log('PDF processing error', err);
+    });
+
+    res.status(201).json({
+      success: true,
+      data: document,
+      message: 'Document uploaded successfully. Processing in progress...',
+    });
+
+  } catch (error) {
+    if (req.file) {
+      await fs.unlink(req.file.path).catch(() => {});
+    }
+    next(error);
+  }
 };
+
 
 //Helper function to process PDF 
 const processPDF = async (documentId, filePath) => {
@@ -182,35 +188,43 @@ export const getDocument = async (req,res,next)=>{
 //@desc Delete document
 //@route DELETE /api/documents/:id
 //@access private
-export const deleteDocument = async (req,res, next)=>{
-    try {
-        const document = await Document.findOne({
-            _id: req.params.id,        
-            userId: req.user._id      
-        });
+export const deleteDocument = async (req, res, next) => {
+  try {
+    const document = await Document.findOne({
+      _id: req.params.id,
+      userId: req.user._id,
+    });
 
-        if(!document){
-            return success.status(404).json({
-                success:false,
-                error:"Docuemtn not found",
-                statusCode:404
-            });
-        }
-
-        //Delete file from fileststem
-        await fs.unlink(document.filePath).catch(()=>{});
-
-        //De;ete document
-        await document.deleteOne();
-
-        res.status(200).json({
-            success:true,
-            message:"Document removed successfuly!"
-        })
-    } catch(error){
-        next(error);
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        error: 'Document not found',
+      });
     }
+
+    // ✅ Delete from Cloudinary
+    const publicId = document.filePath
+      .split('/')
+      .slice(-2)
+      .join('/')
+      .replace('.pdf', '');
+
+    await cloudinary.uploader.destroy(publicId, {
+      resource_type: 'raw',
+    });
+
+    await document.deleteOne();
+
+    res.status(200).json({
+      success: true,
+      message: 'Document removed successfully!',
+    });
+
+  } catch (error) {
+    next(error);
+  }
 };
+
 
 //@desc Update document title
 //@route PUT /api/documents/:id
