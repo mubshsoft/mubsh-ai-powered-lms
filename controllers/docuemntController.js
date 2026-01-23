@@ -22,7 +22,6 @@ export const uploadDocument = async (req, res, next) => {
     }
 
     const { title } = req.body;
-
     if (!title) {
       await fs.unlink(req.file.path);
       return res.status(400).json({
@@ -31,46 +30,36 @@ export const uploadDocument = async (req, res, next) => {
       });
     }
 
-    // ✅ Upload PDF to Cloudinary as RAW
-const cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
-  folder: 'lms/documents',
-  resource_type: 'image', // ✅ IMPORTANT
-  format: 'pdf',
-  use_filename: true,
-  unique_filename: false,
-});
+    // ✅ IMPORTANT: resource_type MUST be "image"
+    const cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
+      resource_type: 'image',
+      folder: 'lms/documents',
+      format: 'pdf',
+      use_filename: true,
+      unique_filename: false,
+    });
 
-    // ✅ FORCE correct RAW PDF URL (no image/upload, no fl_attachment)
-    const pdfUrl = cloudinaryResult.secure_url;
+    console.log('📄 Final PDF URL:', cloudinaryResult.secure_url);
 
-
-    console.log('📄 Final PDF URL:', pdfUrl);
-
-    // ✅ Create document record with FIXED URL
     const document = await Document.create({
       userId: req.user._id,
       title,
       fileName: req.file.originalname,
-      filePath: pdfUrl, // ✅ THIS is the key fix
+      filePath: cloudinaryResult.secure_url, // 👈 correct
       fileSize: req.file.size,
       status: 'processing',
     });
 
-    // ✅ Process PDF using local file
-    processPDF(document._id, req.file.path).catch(err => {
-      console.error('PDF processing error:', err);
-    });
+    processPDF(document._id, req.file.path).catch(console.error);
 
     res.status(201).json({
       success: true,
       data: document,
-      message: 'Document uploaded successfully. Processing in progress...',
+      message: 'Document uploaded successfully',
     });
 
   } catch (error) {
-    if (req.file) {
-      await fs.unlink(req.file.path).catch(() => {});
-    }
+    if (req.file) await fs.unlink(req.file.path).catch(() => {});
     next(error);
   }
 };
