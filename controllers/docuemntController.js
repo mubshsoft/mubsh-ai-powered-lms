@@ -32,18 +32,17 @@ export const uploadDocument = async (req, res, next) => {
     }
 
     // ✅ Upload PDF to Cloudinary as RAW
-    const cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
-      resource_type: 'raw',
-      folder: 'lms/documents',
-      use_filename: true,
-      unique_filename: false,
-    });
+const cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
+  folder: 'lms/documents',
+  resource_type: 'image', // ✅ IMPORTANT
+  format: 'pdf',
+  use_filename: true,
+  unique_filename: false,
+});
 
     // ✅ FORCE correct RAW PDF URL (no image/upload, no fl_attachment)
-    const pdfUrl = cloudinary.url(cloudinaryResult.public_id, {
-      resource_type: 'raw',
-      secure: true,
-    });
+    const pdfUrl = cloudinaryResult.secure_url;
+
 
     console.log('📄 Final PDF URL:', pdfUrl);
 
