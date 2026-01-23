@@ -31,16 +31,21 @@ export const uploadDocument = async (req, res, next) => {
     }
 
     // ✅ Upload PDF to Cloudinary
-    const cloudinaryResult = await cloudinary.uploader.upload(
-      req.file.path,
-      {
-          folder: 'lms/documents',
-          resource_type: 'raw',
-          type: 'upload',      // 👈 VERY IMPORTANT (PUBLIC)
-          access_mode: 'public' // 👈 VERY IMPORTANT
-        
-      }
-    );
+const cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
+  folder: 'lms/documents',
+  resource_type: 'raw',
+  type: 'upload',
+  access_mode: 'public',
+  use_filename: true,
+  unique_filename: true,
+});
+
+console.log('☁️ Cloudinary upload result:', {
+  secure_url: cloudinaryResult.secure_url,
+  public_id: cloudinaryResult.public_id,
+  resource_type: cloudinaryResult.resource_type,
+});
+
 
     // ✅ Create document record
     const document = await Document.create({
