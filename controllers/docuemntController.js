@@ -22,6 +22,7 @@ export const uploadDocument = async (req, res, next) => {
     }
 
     const { title } = req.body;
+
     if (!title) {
       await fs.unlink(req.file.path);
       return res.status(400).json({
@@ -30,32 +31,35 @@ export const uploadDocument = async (req, res, next) => {
       });
     }
 
-    // ✅ Upload PDF to Cloudinary
-const cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
-  resource_type: 'raw',
-folder: 'lms/documents',
-use_filename: true,
-unique_filename: false,
+    // ✅ Upload PDF to Cloudinary as RAW
+    const cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
+      resource_type: 'raw',
+      folder: 'lms/documents',
+      use_filename: true,
+      unique_filename: false,
+    });
 
-});
+    // ✅ FORCE correct RAW PDF URL (no image/upload, no fl_attachment)
+    const pdfUrl = cloudinary.url(cloudinaryResult.public_id, {
+      resource_type: 'raw',
+      secure: true,
+    });
 
-console.log('☁️ Cloudinary upload:', cloudinaryResult.secure_url);
+    console.log('📄 Final PDF URL:', pdfUrl);
 
-
-
-    // ✅ Create document record
+    // ✅ Create document record with FIXED URL
     const document = await Document.create({
       userId: req.user._id,
       title,
       fileName: req.file.originalname,
-      filePath: cloudinaryResult.secure_url, // Cloudinary URL
+      filePath: pdfUrl, // ✅ THIS is the key fix
       fileSize: req.file.size,
       status: 'processing',
     });
 
     // ✅ Process PDF using local file
     processPDF(document._id, req.file.path).catch(err => {
-      console.log('PDF processing error', err);
+      console.error('PDF processing error:', err);
     });
 
     res.status(201).json({
