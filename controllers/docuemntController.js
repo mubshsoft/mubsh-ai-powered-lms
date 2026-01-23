@@ -35,7 +35,8 @@ export const uploadDocument = async (req, res, next) => {
       req.file.path,
       {
         folder: 'lms/documents',
-        resource_type: 'auto', // IMPORTANT for PDF
+        resource_type: 'raw',
+        use_filename: true, // IMPORTANT for PDF
         
       }
     );
