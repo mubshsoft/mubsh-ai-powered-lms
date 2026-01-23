@@ -32,11 +32,11 @@ export const uploadDocument = async (req, res, next) => {
 
     // ✅ Upload PDF to Cloudinary
 const cloudinaryResult = await cloudinary.uploader.upload(req.file.path, {
-  folder: 'lms/documents',
-  resource_type: 'image',   // ✅ KEY FIX
-  format: 'pdf',
-  type: 'upload',
-  access_mode: 'public',
+  resource_type: 'raw',
+folder: 'lms/documents',
+use_filename: true,
+unique_filename: false,
+
 });
 
 console.log('☁️ Cloudinary upload:', cloudinaryResult.secure_url);
